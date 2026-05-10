@@ -1,0 +1,371 @@
+//
+//------------------------------------------------------------------------
+//                                                                       |
+//   File Name:     Model1.run                                           |
+//   Date(s):       April 4, 2026					                     |
+//   Author:        Muhammad Sardar                                      |
+//   Description:   File to run the Engine Model                         |
+//                                                                       |
+//------------------------------------------------------------------------
+
+cout << "\n\nSTART RUN:  TIME = "<< timeOfDay << "\n\n";
+#include <Project3.mdl>
+
+//----------------------------------------------------------------------------
+//                          User-Defined Elements
+//----------------------------------------------------------------------------
+#include <print_macros.fnc>
+#include <SFTF.fnc>
+
+//----------------------------------------------------------------------------
+//                           Output Data Viewers 
+//----------------------------------------------------------------------------
+#include <Project3.view>
+#include <EngineDeck.row>
+
+//----------------------------------------------------------------------------
+//  Step 1 and 2
+//----------------------------------------------------------------------------
+#include <vars.list> //please change the file name here before running
+
+//----------------------------------------------------------------------------
+//  Variable Declarations
+//----------------------------------------------------------------------------
+real Dfan;
+real Weng;
+real Leng;
+real OPRD;
+real DNAC;
+real XNAC;
+real DOWE;
+real FAR_TOC_val;
+real Tt4_TOC_val;
+real W_TOC_val;
+real Fn_TOC_val;
+
+
+cout << "------------------------------------\n"; 
+cout << "        RUNNING DESIGN POINT        \n"; 
+cout << "------------------------------------\n"; 
+
+setOption ("switchDes", "DESIGN");
+
+solver.defaultTolerance = 0.00000005;
+solver.defaultToleranceType = "FRACTIONAL";  //ABSOLUTE
+solver.maxJacobians = 800;
+solver.maxIterations = 2000;
+solver.defaultDxLimit = 0.05;
+autoSolverSetup(); //MUST CALL autosolver setup before adding solver variables because autosolversetup() clears the solver!
+
+//----------------------------------------------------------------------------
+//Step 3 Set-up on-design solver to hit top of climb thrust requirement
+//----------------------------------------------------------------------------
+solver.addIndependent("Des_Airflow");
+solver.addDependent("Des_Thrust");
+
+//----------------------------------------------------------------------------
+// Step 3 Set up on-design solver to hit Tt4des and utilize BPR technology curve
+//----------------------------------------------------------------------------
+solver.addIndependent("Burner_FAR");
+solver.addDependent("Des_T4");
+
+solver.addIndependent("Des_BPR");
+solver.addDependent("Des_Extraction_Ratio");
+
+verify();
+run();
+pv.display();
+printPride();
+
+// Saving TOC values before they get overwritten by off-design runs
+FAR_TOC_val  = BrnPri.FAR;
+Tt4_TOC_val  = BrnPri.Fl_O.Tt;
+W_TOC_val    = Amb.W;
+Fn_TOC_val   = Eng.Fn;
+
+cout << "STEP 1:" << endl;
+cout << "FPR              = " << CmpFan.S_map.PRdes << endl;
+cout << "LPCPR            = " << CmpL.S_map.PRdes << endl;
+cout << "HPCPR            = " << CmpH.S_map.PRdes << endl;
+cout << "OPR             = " << CmpH.Fl_O.Pt/CmpFan.Fl_I.Pt << endl;
+cout << "BPR             = " << SpltFan.BPR << endl;
+cout << "Extraction Ratio = " << D015.Fl_O.Pt/D070.Fl_O.Pt << endl;
+cout << endl;
+
+cout << "STEP 2A - Design T4:" << endl;
+cout << "Tt4des at TOC    = " << Des_T4.eq_rhs << endl;
+cout << endl;
+
+cout << "STEP 2B - Cooling:" << endl;
+cout << "%NC_Cooling      = " << B030.B030_NC.fracW << endl;
+cout << endl;
+
+cout << "STEP 3 - Mass Flow and Thrust:" << endl;
+cout << "  TOC Mass Flow  = " << W_TOC_val << " lbm/s" << endl;
+cout << "  FnTOC          = " << Fn_TOC_val << " lbf" << endl;
+cout << "  FARTOC         = " << FAR_TOC_val << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 4: Compute Fan Diameter
+//----------------------------------------------------------------------------
+Dfan = sqrt( 4.0*CmpFan.Fl_I.Aphy / (3.14159265 * (1.0 - 0.28**2)) );
+
+cout << "STEP 4 - Fan Diameter:" << endl;
+cout << "Fan Inlet Area   = " << CmpFan.Fl_I.Aphy << " in^2" << endl;
+cout << "Fan Diameter     = " << Dfan << " inches" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 5: Check Fan Diameter Constraint
+//----------------------------------------------------------------------------
+cout << "STEP 5 - Fan Diameter Constraint Check:" << endl;
+if ( Dfan < 79.0 ) {
+    cout << "Fan diameter constraint SATISFIED: " << Dfan << " < 79.0 inches" << endl;
+} else {
+    cout << "WARNING: Fan diameter constraint VIOLATED: " << Dfan << " >= 79.0 inches" << endl;
+    cout << "--> Go back to Step 1 and increase FPRD" << endl;
+    quit();
+}
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 6: Compute Engine Weight and Engine Length
+//----------------------------------------------------------------------------
+OPRD = CmpH.Fl_O.Pt / CmpFan.Fl_I.Pt;
+Weng = 300.*(1.6 - CmpFan.S_map.PRdes) + (120.*OPRD) + 100.;
+Leng = 0.78086*OPRD + 75.2;
+
+cout << "STEP 6:" << endl;
+cout << "OPRD             = " << OPRD << endl;
+cout << "Weng             = " << Weng << " lbs" << endl;
+cout << "Leng             = " << Leng << " inches" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 7: Check Engine Weight Constraint
+//----------------------------------------------------------------------------
+cout << "STEP 7 - Engine Weight Constraint Check:" << endl;
+if ( Weng < 6500.0 ) {
+    cout << "Engine weight constraint SATISFIED: " << Weng << " < 6500 lbs" << endl;
+} else {
+    cout << "WARNING: Engine weight constraint VIOLATED: " << Weng << " >= 6500 lbs" << endl;
+    cout << "--> Go back to Step 1 and adjust FPRD, LPCPRD, or HPCPRD" << endl;
+    quit();
+}
+cout << endl;
+
+cout << "------------------------------------\n"; 
+cout << "        RUNNING OFF-DESIGN          \n"; 
+cout << "------------------------------------\n"; 
+
+cout << "Running Off Design\n\n";
+setOption ("switchDes", "OFFDESIGN");
+
+solver.defaultTolerance = 0.00000005;
+solver.defaultToleranceType = "FRACTIONAL";  //ABSOLUTE
+solver.maxJacobians = 800;
+solver.maxIterations = 2000;
+solver.defaultDxLimit = 0.01;
+
+autoSolverSetup();
+
+// Running Design Point Condition in Off-Design Mode
+CASE = 1;
+verify();
+run();
+pv.display();
+
+//----------------------------------------------------------------------------
+//      Step 8: Stepping Down to Take-off Condition
+//----------------------------------------------------------------------------
+
+cout << "STEP 8: Running Engine to Take-off Condition" << endl;
+Amb.dTs = 0.0;
+Amb.alt = 35000.; Amb.MN = 0.80; RunMaxThrust();
+Amb.alt = 35000.; Amb.MN = 0.70; RunMaxThrust();
+Amb.alt = 35000.; Amb.MN = 0.60; RunMaxThrust();
+Amb.alt = 32000.; Amb.MN = 0.60; RunMaxThrust();
+Amb.alt = 30000.; Amb.MN = 0.60; RunMaxThrust();
+Amb.alt = 30000.; Amb.MN = 0.50; RunMaxThrust();
+Amb.alt = 30000.; Amb.MN = 0.40; RunMaxThrust();
+Amb.alt = 30000.; Amb.MN = 0.35; RunMaxThrust();
+Amb.alt = 30000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 28000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 26000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 25000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 23000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 21000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 20000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 18000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 16000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 15000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 13000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 12000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 10000.; Amb.MN = 0.30; RunMaxThrust();
+Amb.alt = 10000.; Amb.MN = 0.28; RunMaxThrust();
+Amb.alt = 10000.; Amb.MN = 0.25; RunMaxThrust();
+Amb.alt = 7500.;  Amb.MN = 0.25; RunMaxThrust();
+Amb.alt = 5000.;  Amb.MN = 0.25; RunMaxThrust();
+Amb.alt = 2500.;  Amb.MN = 0.25; RunMaxThrust();
+Amb.alt = 0.0;    Amb.MN = 0.25; RunMaxThrust();
+
+// Giving the solver more room during hot day ramp
+solver.maxIterations = 5000;
+solver.maxJacobians = 2000;
+solver.defaultDxLimit = 0.001;
+
+// Now apply hot day and reach take-off condition
+Amb.dTs = 1.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 2.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 3.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 4.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 5.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 6.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 7.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 8.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 9.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 10.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 11.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 12.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 13.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 14.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 15.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 16.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 17.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 18.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 19.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 20.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 21.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 22.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 23.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 24.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 25.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 26.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 27.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+
+pv.display();
+
+cout << "  Take-off Condition Reached Successfully!" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 9: Solver Setup to hit Tt4 at Takeoff
+//----------------------------------------------------------------------------
+autoSolverSetup();
+solver.addIndependent("Burner_FAR");
+solver.addDependent("Max_T4_TO");
+run(); CASE++;
+pv.display();
+
+//----------------------------------------------------------------------------
+//      Step 10: Checking Tt3_TO Constraint
+//----------------------------------------------------------------------------
+cout << "STEP 10 - Tt3 Constraint Check:" << endl;
+if ( CmpH.Fl_O.Tt < 1660.0 ) {
+    cout << "Tt3 constraint SATISFIED: Tt3 = " << CmpH.Fl_O.Tt << " < 1660 R" << endl;
+} else {
+    cout << "WARNING: Tt3 constraint VIOLATED: Tt3 = " << CmpH.Fl_O.Tt << " >= 1660 R" << endl;
+    cout << "--> Go back to Step 1 and reduce LPCPRD or HPCPRD" << endl;
+    quit();
+}
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 11: Checking Tt41_TO Requirement
+//----------------------------------------------------------------------------
+cout << "STEP 11 - Tt41 Requirement Check:" << endl;
+cout << "Tt41 at Take-off  = " << TrbH.FS41.Tt << " R" << endl;
+if ( (3175.0 - TrbH.FS41.Tt) >= 0.0 && (3175.0 - TrbH.FS41.Tt) < 2.0 ) {
+    cout << "Tt41 requirement SATISFIED" << endl;
+} else {
+    cout << "WARNING: Tt41 requirement NOT MET. Adjust %NC Cooling in Step 2B" << endl;
+    cout << "--> Target: 3173 R < Tt41 < 3175 R" << endl;
+    cout << "--> Current difference from 3175: " << 3175.0 - TrbH.FS41.Tt << " R" << endl;
+    quit();
+}
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 12: Checking Take-off Thrust Requirement
+//----------------------------------------------------------------------------
+cout << "STEP 12 - Take-off Thrust Requirement Check:" << endl;
+cout << "FnTO              = " << Eng.Fn << " lbf" << endl;
+if ( (Eng.Fn - 22000.0) >= 0.0 && (Eng.Fn - 22000.0) < 100.0 ) {
+    cout << "Take-off thrust requirement SATISFIED" << endl;
+} else {
+    cout << "WARNING: Take-off thrust NOT MET. Adjust Tt4des in Step 2A" << endl;
+    cout << "--> Need FnTO between 22000 and 22100 lbf" << endl;
+    cout << "--> Current margin: " << Eng.Fn - 22000.0 << " lbf" << endl;
+    quit();
+}
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Submission Table Summary
+//----------------------------------------------------------------------------
+cout << "====================================================" << endl;
+cout << "        SUBMISSION TABLE SUMMARY                    " << endl;
+cout << "====================================================" << endl;
+cout << "  FPRD             = " << CmpFan.S_map.PRdes << endl;
+cout << "  LPCPRD           = " << CmpL.S_map.PRdes << endl;
+cout << "  HPCPRD           = " << CmpH.S_map.PRdes << endl;
+cout << "  OPRD             = " << OPRD << endl;
+cout << "  BPRD             = " << SpltFan.BPR << endl;
+cout << "  FAR_TOC          = " << FAR_TOC_val << endl;
+cout << "  Tt4des_TOC       = " << Tt4_TOC_val << " R" << endl;
+cout << "  % NC_Cooling     = " << B030.B030_NC.fracW << endl;
+cout << "  TOC_MassFlow     = " << W_TOC_val << " lbm/s" << endl;
+cout << "  Fn_TOC           = " << Fn_TOC_val << " lbf" << endl;
+cout << "  Dfan             = " << Dfan << " inches" << endl;
+cout << "  Weng             = " << Weng << " lbs" << endl;
+cout << "  Leng             = " << Leng << " inches" << endl;
+cout << "  FAR_TO           = " << BrnPri.FAR << endl;
+cout << "  Tt41_TO          = " << TrbH.FS41.Tt << " R" << endl;
+cout << "  Tt4_TO           = " << BrnPri.Fl_O.Tt << " R" << endl;
+cout << "  Tt3_TO           = " << CmpH.Fl_O.Tt << " R" << endl;
+cout << "  Fn_TO            = " << Eng.Fn << " lbf" << endl;
+cout << "====================================================" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 13: Checking Take-off Bypass Jet Velocity as Noise Surrogate
+//----------------------------------------------------------------------------
+cout << "STEP 13: No bypass jet velocity noise constraint - proceeding" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Convergence Run back to SLS
+//----------------------------------------------------------------------------
+Amb.dTs = 27.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 15.0; Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.dTs = 0.0;  Amb.alt = 0.; Amb.MN = 0.25; RunMaxThrust();
+Amb.alt = 0.;   Amb.MN = 0.00; RunMaxThrust();
+
+//----------------------------------------------------------------------------
+//      Step 14: Running Engine Deck
+//----------------------------------------------------------------------------
+cout << "STEP 14: Running Engine Deck..." << endl;
+deckUpdate = 1;
+RunEngDeck();
+deckUpdate = 0;
+cout << "  Engine Deck Complete!" << endl;
+cout << endl;
+
+//----------------------------------------------------------------------------
+//      Step 15: Parameters to be input into Mission Analysis
+//----------------------------------------------------------------------------
+DOWE = 84035. + (2. * Weng);
+DNAC = (Dfan + 25.) / 12.;
+XNAC = Leng / 12.;
+
+cout << "====================================================" << endl;
+cout << "             FLOPS INPUT PARAMETERS                 " << endl;
+cout << "====================================================" << endl;
+cout << "  XNAC             = " << XNAC << " ft" << endl;
+cout << "  DNAC             = " << DNAC << " ft" << endl;
+cout << "  DOWE             = " << DOWE << " lbs" << endl;
+cout << "  THRUST/THRSO     = (use max SLS thrust from engine deck)" << endl;
+cout << endl;
+
+cout << "COMPLETED RUN:  TIME = "<< timeOfDay << endl;

@@ -1,0 +1,331 @@
+//
+//------------------------------------------------------------------------
+//                                                                       |
+//   File Name:     Model1.mdl                                           |
+//   Date(s):       													 |
+//   Author:                                                             |
+//   Description:   Engine Model                                         |
+//                                                                       |
+//------------------------------------------------------------------------
+
+//Add subelement definition to read nozzle maps
+#include <nozzle_read_cdth.int>
+#include <nozzle_read_cv.int>
+
+
+setThermoPackage("GasTbl");
+
+Element FlightConditions Amb {
+	alt = 30000.0;
+	MN = 0.78;
+	W = 122.683;
+}
+
+Element Inlet InEng {
+ 
+	Fl_O.MN = 0.6;
+	Subelement ramRecovery S_rec {
+		eRamDes = 0.9970;  
+		Table TB_rec( real Mach ) {
+			Mach = { 0.000,  0.025,  0.100,  0.200,  0.250,  0.300,  0.400,  0.500,  0.600,  0.700,  0.900 }
+			etar = { 0.993,  0.996,  0.995,  0.993,  0.9925, 0.992,  0.998,  0.998,  0.997,  0.997,  0.997 } 
+		}
+	}	
+
+}
+
+Element Compressor CmpFan {
+
+	#include <CmpFan.map> 
+	
+    Fl_O.MN = 0.45;
+    S_map.alpha = 0.00; 
+    S_map.RlineMap = 1.6000;
+    S_map.NcDes = 0.900;
+    S_map.PRdes = 1.500;
+    S_map.effDes = 0.8900;
+    
+}
+
+Element Splitter SpltFan {
+
+	BPR = 1.8687;
+	Fl_01.MN = 0.5;
+	Fl_02.MN = 0.5;
+
+}
+
+Element Duct D022 { 
+
+   Fl_O.MN = 0.30; 
+   dPqPbase = 0.005;
+ 
+} 
+
+Element Compressor CmpL { 
+	#include <CmpL.map> 
+	Fl_O.MN = 0.40; 
+
+	S_map.RlineMap = 1.8000;
+	S_map.NcDes = 1.0;
+	S_map.PRdes = 1.300;
+	S_map.effDes = 0.9000;
+ 
+}
+
+
+Element Duct D024 { 
+	
+	Fl_O.MN = 0.35; 
+	dPqPbase = 0.015;
+ 
+} 
+
+Element Compressor CmpH {
+
+	#include <CmpH.map>
+    Fl_O.MN = 0.30;
+
+    S_map.RlineMap = 2.0000;
+    S_map.NcDes = 0.985;
+	S_map.PRdes = 20.00;
+	S_map.effDes = 0.8650;
+
+
+	InterStageBleedOutPort  B028_NC {
+		fracBldWork = 0.45;
+		fracBldP = 0.5000;
+		fracBldW = 0.065;
+	}
+
+	InterStageBleedOutPort  B028_Ch {
+		fracBldWork = 0.45;
+		fracBldP = 0.5000;
+		fracBldW = 0.065;
+	}
+
+}
+
+Element Bleed  B030  {
+
+	Fl_O.MN = 0.30; 
+	BleedOutPort CbldECS {   
+		fracW = 0.045;
+	} 
+	BleedOutPort B030_NC {	    
+		fracW = 0.080;
+	} 
+	BleedOutPort B030_Ch {	
+		fracW = 0.055;
+	}
+  
+}
+
+Element FuelStart Fuel {
+
+	Tfuel = 518.67;
+	LHV = 18580.0;
+
+}
+
+Element Burner BrnPri {
+
+	FAR = 0.035;
+	effBase = 0.997;
+	dPqPBase = 0.035;
+	Fl_O.MN = 0.10;
+
+}
+
+Element Turbine TrbH {
+
+	#include <TrbH.map>
+
+	FlowStation FS41;
+	Fl_O.MN = 0.30;
+
+	S_map.effDes = 0.9200;
+	S_map.parmMap = 5.280;
+	S_map.parmGeomDes = 1.0;
+	S_map.parmMapDes = 4.800;
+	S_map.parmNcDes = 100.0;
+
+	InterStageBleedInPort B030TrbHNC { 
+		Pfract  = 1.0;
+		diaPump = 0.0;
+	}
+
+	InterStageBleedInPort B030TrbHCh { 
+		Pfract  = 0.0;
+		diaPump = 0.0;
+	}
+	void postexecute() { 
+		FS41.copyFlow("Fl_I");
+		FS41.add("B030TrbHNC");
+	} 
+
+}
+
+Element Duct D048 { 
+	
+   Fl_O.MN = 0.40; 
+	dPqPbase = 0.005;   
+
+} 
+
+Element Turbine TrbL {
+
+	#include <TrbL.map>
+
+	Fl_O.MN = 0.35;
+
+	S_map.effDes = 0.9300;
+	S_map.parmMap = 5.010;
+	S_map.parmGeomDes = 1.0;
+	S_map.parmMapDes = 5.500;
+	S_map.parmNcDes = 100.0;
+
+	InterStageBleedInPort B028TrbLNC { 
+		Pfract  = 1.0;
+		diaPump = 0.0;
+	} 	
+
+   InterStageBleedInPort B028TrbLCh { 
+		Pfract  = 0.0;
+		diaPump = 0.0;
+   }
+
+}
+
+Element Duct D070 {
+
+	Fl_O.MN = 0.60;
+	dPqPbase = 0.01;
+
+}
+
+
+Element Nozzle NozPri {
+
+	switchType = "CONIC";
+	switchCoef = "CV";
+	Cang = 0.997;
+
+	Table DischargeCoeff( real PR ) { 
+		PR =   {1.0, 1.08, 1.25, 1.6, 2, 2.25,  2.5,   3.0,  4.0, 5.0, 7.0}
+		CdTh = {0.89, 0.907, 0.922, 0.945, 0.96, 0.966, 0.968, 0.97, 0.9725, 0.974, 0.975}
+		PR.interp = "linear";
+	}
+
+	Subelement CDTH S_CdTh {  
+	}
+
+	Table VelCoeff( real PR ) { 
+		PR = {1.0,  2.1, 2.6444, 3.1889, 3.7333, 4.2778, 4.8222, 5.3667, 5.9111, 6.4556, 7.0}
+		Cv = {0.9962, 0.9952, 0.9936, 0.9886, 0.9825, 0.9757, 0.9691, 0.9631, 0.9574, 0.952, 0.947}
+		PR.interp = "linear";
+	} 
+
+	Subelement CVELOCITY S_Cv { 
+	}
+
+	PsExhName = "Amb.Ps";
+}
+
+Element Duct D015 {
+
+	Fl_O.MN = 0.30;
+	dPqPbase = 0.02;
+
+}
+
+Element Nozzle NozSec { 
+	switchType = "CONIC";
+	switchCoef = "CV";
+	Cang = 0.997;
+
+	Table DischargeCoeff( real PR ) { 
+		PR =   {1.0, 1.08, 1.25, 1.6, 2, 2.25,  2.5,   3.0,  4.0, 5.0, 7.0}
+		CdTh = {0.89, 0.907, 0.922, 0.945, 0.96, 0.966, 0.968, 0.97, 0.9725, 0.974, 0.975}
+		PR.interp = "linear";
+	}
+
+	Subelement CDTH S_CdTh {  
+	} 
+
+	Table VelCoeff( real PR ) { 
+		PR = {1.0,  2.1, 2.6444, 3.1889, 3.7333, 4.2778, 4.8222, 5.3667, 5.9111, 6.4556, 7}
+		Cv = {0.9962, 0.9952, 0.9936, 0.9886, 0.9825, 0.9757, 0.9691, 0.9631, 0.9574, 0.952, 0.947}
+		PR.interp = "linear";
+	} 
+
+	Subelement CVELOCITY S_Cv { 
+	} 
+
+	PsExhName = "Amb.Ps"; 
+}
+
+Element Shaft ShH {
+	ShaftInputPort HPC, HPT;
+	
+	HPX = 0.0;
+	Nmech = 8600.0;
+}
+
+Element Shaft ShL {
+	ShaftInputPort FAN, LPC, LPT;
+	
+	HPX = 0.0;
+	Nmech = 2200.0;
+}
+
+Element FlowEnd Fend1 {
+}
+
+Element FlowEnd Fend2 {
+}
+
+Element FlowEnd FeSec1 { 
+}
+
+Element EngPerf Eng {
+
+}
+
+
+//Flow Ports
+linkPorts( "Amb.Fl_O"       	, "InEng.Fl_I"          , "FS1"   ); 
+linkPorts( "InEng.Fl_O"			, "CmpFan.Fl_I"			, "FS2"   );
+linkPorts( "CmpFan.Fl_O"		, "SpltFan.Fl_I"		, "FS21"  );
+linkPorts( "SpltFan.Fl_01"		, "D022.Fl_I"           , "FS22"  );
+linkPorts( "D022.Fl_O"          , "CmpL.Fl_I"			, "FS23"  );
+linkPorts( "CmpL.Fl_O"			, "D024.Fl_I"			, "FS24"  );
+linkPorts( "D024.Fl_O"			, "CmpH.Fl_I"			, "FS25"  );
+linkPorts( "CmpH.Fl_O"          , "B030.Fl_I"           , "FS3"   );
+linkPorts( "B030.Fl_O"          , "BrnPri.Fl_I"         , "FS31"  );
+linkPorts( "BrnPri.Fl_O"		, "TrbH.Fl_I"			, "FS4"   );
+linkPorts( "TrbH.Fl_O"			, "D048.Fl_I"           , "FS45"  );
+linkPorts( "D048.Fl_O"          , "TrbL.Fl_I"			, "FS48"  );
+linkPorts( "TrbL.Fl_O"			, "D070.Fl_I"			, "FS5"	  );
+linkPorts( "D070.Fl_O"			, "NozPri.Fl_I"			, "FS7"	  );
+linkPorts( "NozPri.Fl_O"		, "Fend1.Fl_I"			, "FS9"   );
+linkPorts( "SpltFan.Fl_02"		, "D015.Fl_I"		    , "FS15"  );
+linkPorts( "D015.Fl_O"	        , "NozSec.Fl_I"			, "FS17"  );
+linkPorts( "NozSec.Fl_O"		, "Fend2.Fl_I"			, "FS19"  );
+
+//Shaft Ports
+linkPorts( "CmpH.Sh_O"          , "ShH.HPC"        		, "HPCwork" );
+linkPorts( "TrbH.Sh_O" 			, "ShH.HPT"        		, "HPTwork" );
+linkPorts( "CmpFan.Sh_O"        , "ShL.FAN"        		, "Fanwork" );
+linkPorts( "CmpL.Sh_O"          , "ShL.LPC"        		, "LPCwork" );
+linkPorts( "TrbL.Sh_O" 			, "ShL.LPT"        		, "LPTwork" );
+
+//Fuel Ports
+linkPorts( "Fuel.Fu_O"			, "BrnPri.Fu_I"         , "FS35" ); 
+
+//Bleeds
+linkPorts( "CmpH.B028_NC"		, "TrbL.B028TrbLNC"		, "B028_049");
+linkPorts( "CmpH.B028_Ch"		, "TrbL.B028TrbLCh"		, "B028_050");
+linkPorts( "B030.CbldECS"		, "FeSec1.Fl_I"			, "CbldECS"	);
+linkPorts( "B030.B030_NC"		, "TrbH.B030TrbHNC"		, "B030_041");
+linkPorts( "B030.B030_Ch"		, "TrbH.B030TrbHCh"		, "B030_042");
