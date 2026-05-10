@@ -1,0 +1,41 @@
+// -----------------------------------------------------------------------------
+// Set On-Design Ambient Condition
+// -----------------------------------------------------------------------------
+   Amb.MN  = 0.80;
+   Amb.alt  = 35000.00;
+   Amb.dTs  = 0.0;
+
+// -----------------------------------------------------------------------------
+// Step 1: Select Design FPRD, LPCPRD, and HPCPRD and Technology Curves
+// -----------------------------------------------------------------------------
+   CmpFan.S_map.PRdes = 1.5435; //1.45 ≤ FPRD ≤ 1.65
+   CmpL.S_map.PRdes   = 1.5; //1.50 ≤ LPCPRD ≤ 2.25
+   CmpH.S_map.PRdes   = 10.0; //8.0 ≤ HPCPR ≤ 15.0
+
+// Fan Technology Curve
+   CmpFan.S_map.effDes = -1.6*(CmpFan.S_map.PRdes**2) + 4.59*(CmpFan.S_map.PRdes) - 2.39;
+
+// Low Pressure Compressor Technology Curve
+   CmpL.S_map.effDes = -0.0265*(CmpL.S_map.PRdes**2) + 0.0599*(CmpL.S_map.PRdes) + 0.816;
+   
+// High Pressure Compressor Technology Curve
+   CmpH.S_map.effDes = -0.00024206*(CmpH.S_map.PRdes**2) + 0.0048033*(CmpH.S_map.PRdes) + 0.90;
+
+// Extraction Ratio for "Best" BPR
+   Des_Extraction_Ratio.eq_rhs = "1.33333 * CmpFan.S_map.PRdes - 0.4";
+   
+// -----------------------------------------------------------------------------
+// Step 2A: Guess an design T4 (don't forget to set up the on-design solver pair
+// -----------------------------------------------------------------------------
+   Des_T4.eq_rhs = "2707.0"; //best range is 2600 - 2700
+
+// -----------------------------------------------------------------------------
+// Step 2B: Guess % non-chargeable cooling (B030.B030_NC.fracW)
+// -----------------------------------------------------------------------------
+   B030.B030_NC.fracW = 0.043; //around 0.04
+
+// -----------------------------------------------------------------------------
+// Step 3: Set Design Thrust (don't forget to set up the on-design solver pair)
+// -----------------------------------------------------------------------------
+   Des_Thrust.eq_rhs = "5500.0";
+
