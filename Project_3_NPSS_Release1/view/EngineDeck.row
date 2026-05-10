@@ -1,0 +1,19 @@
+
+OutFileStream FLOPsheetStream { filename = "engine.deck"; } 
+
+DataViewer CaseRowViewer Decksheet { 
+
+  caseHeaderBody = ""; 
+  caseHeaderVars = {} 
+  
+  variableList = { "Amb.MN: ?.?? = Mach", "Amb.alt: ??????.? = Alt", "0:??? = PC", "Eng.Fg: ??????.? = GrossF", "Eng.Fram: ??????.? = RamD", "Eng.WfuelHour: ??????.? = WFuel","Eng.TSFC: ??.????? = TSFC", "0.0: ??????.? = NOx", "0.0: ????.?? = NozA"  } 
+  
+  
+  showMarks = FALSE; 
+  showHeaders = FALSE; 
+  pageWidth = 124; 
+  pageHeight = 800; 
+  
+  outStreamHandle = "FLOPsheetStream"; 
+
+} 
